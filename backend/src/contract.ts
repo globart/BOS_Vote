@@ -26,12 +26,13 @@ class VotingContract {
     this.voters.set("lina-ukrainka.testnet");
     this.voters.set("grygoriy-malyshko.testnet");
 
-    this.candidates.set("0", "Володимир Зеленський");
-    this.candidates.set("1", "Петро Порошенко");
+    this.candidates.set("0", "Откаленко Орина");
+    this.candidates.set("1", "Станков Артем");
     this.candidates.set("2", "Проти всіх");
 
     near.log(`There are ${this.superadmins.length} superadmins, ${this.admins.length} admins, ${this.voters.length} voters`);
   }
+
 
   @view({})
   getCandidates(): [string, string][] {
@@ -41,6 +42,7 @@ class VotingContract {
   getVotes(): [string, string[]][] {
     return this.votes.toArray();
   }
+
   @view({})
   isSuperAdmin({ user }: { user: string }): boolean {
     if (this.superadmins.contains(user)) {
@@ -49,6 +51,17 @@ class VotingContract {
     }
     else {
       near.log(`User ${user} isn't superadmin`);
+      return false;
+    }
+  }
+  @view({})
+  isAdmin({ user }: { user: string }): boolean {
+    if (this.admins.contains(user)) {
+      near.log(`User ${user} is admin`);
+      return true;
+    }
+    else {
+      near.log(`User ${user} isn't admin`);
       return false;
     }
   }
@@ -64,29 +77,15 @@ class VotingContract {
     }
   }
   @view({})
-  isAdmin({ user }: { user: string }): boolean {
-    if (this.admins.contains(user)) {
-      near.log(`User ${user} is admin`);
-      return true;
-    }
-    else {
-      near.log(`User ${user} isn't admin`);
-      return false;
-    }
-  }
-
-  @view({})
   canVote({ user }: { user: string }): boolean {
-    if (!this.voters.contains(user)) {
-      near.log(`User ${user} isn't voter`);
-      return false;
-    }
-    else {
+    if (this.isVoter({ user })) {
       for (const params of this.votes.toArray()) {
         if (params[1].includes(user)) {
+          near.log(`User ${user} already voted`);
           return false;
         }
       }
+      near.log(`User ${user} can vote`);
       return true;
     }
   }
@@ -94,22 +93,14 @@ class VotingContract {
 
   @call({})
   addAdmin({ admin, user }: { admin: string, user: string }) {
-    if (!this.superadmins.contains(user)) {
-      near.log(`User ${user} isn't superadmin`);
-      return;
-    }
-    else {
+    if (this.isSuperAdmin({ user })) {
       this.admins.set(admin)
       near.log(`Admin ${admin} was added by ${user}`);
     }
   }
   @call({})
   deleteAdmin({ admin, user }: { admin: string, user: string }) {
-    if (!this.superadmins.contains(user)) {
-      near.log(`User ${user} isn't superadmin`);
-      return;
-    }
-    else {
+    if (this.isSuperAdmin({ user })) {
       this.admins.remove(admin)
       near.log(`Admin ${admin} was deleted by ${user}`);
     }
@@ -117,22 +108,14 @@ class VotingContract {
 
   @call({})
   addVoter({ voter, user }: { voter: string, user: string }) {
-    if (!this.admins.contains(user)) {
-      near.log(`User ${user} isn't admin`);
-      return;
-    }
-    else {
+    if (this.isAdmin({ user })) {
       this.voters.set(voter)
       near.log(`Voter ${voter} was added by ${user}`);
     }
   }
   @call({})
   deleteVoter({ voter, user }: { voter: string, user: string }) {
-    if (!this.admins.contains(user)) {
-      near.log(`User ${user} isn't admin`);
-      return;
-    }
-    else {
+    if (this.isAdmin({ user })) {
       this.voters.remove(voter)
       near.log(`Voter ${voter} was deleted by ${user}`);
     }
@@ -140,11 +123,7 @@ class VotingContract {
 
   @call({})
   addCandidate({ candidate, user }: { candidate: string, user: string }) {
-    if (!this.admins.contains(user)) {
-      near.log(`User ${user} isn't admin`);
-      return;
-    }
-    else {
+    if (this.isAdmin({ user })) {
       let new_index = 0;
       if (this.candidates.length > 0) {
         new_index = Math.max(...this.candidates.toArray().map(i => Number(i[0]))) + 1;
@@ -155,11 +134,7 @@ class VotingContract {
   }
   @call({})
   deleteCandidate({ candidateId, user }: { candidateId: string, user: string }) {
-    if (!this.admins.contains(user)) {
-      near.log(`User ${user} isn't admin`);
-      return;
-    }
-    else {
+    if (this.isAdmin({ user })) {
       this.candidates.remove(candidateId);
       near.log(`Candidate ${this.candidates[candidateId]} was deleted by ${user}`);
     }
@@ -177,11 +152,7 @@ class VotingContract {
 
   @call({})
   clearPools({ user }: { user: string }) {
-    if (!this.superadmins.contains(user)) {
-      near.log(`User ${user} isn't superadmin`);
-      return;
-    }
-    else {
+    if (this.isSuperAdmin({ user })) {
       this.candidates.clear();
       this.votes.clear();
       near.log(`Pools were cleared by ${user}`);
